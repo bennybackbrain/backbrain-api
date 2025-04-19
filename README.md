@@ -1,16 +1,16 @@
-# BackBrain API (AutoStart)
+# BackBrain API (Vollständig & Automatisch)
 
-Fertig eingerichtete API für Render.com – sofort lauffähig.
+Diese API durchsucht `.txt` und `.md` Dateien im Nextcloud-Ordner `benny_gpt`
+nach Stichwörtern und liefert Treffer kontextbezogen zurück.
 
-## Funktionen
-- Durchsucht alle `.txt` und `.md` Dateien in deinem Nextcloud-Ordner `benny_gpt`
-- Gibt Trefferstellen mit Kontext an GPT zurück
+## Funktionsweise:
+- Listet alle relevanten Dateien (WebDAV)
+- Durchsucht Inhalt zeilenweise
+- Gibt Fundstellen + Kontext aus
 
-## Startbefehl
-Wird automatisch über `start.sh` ausgeführt.
+## Aufruf (nach Deployment bei Render.com):
+GET /search-files?query=deinbegriff
 
-## .env
-Leg dein Passwort hier rein (Beispiel enthalten)
-
-## URL
-GET /search-files?query=begriff
+## Setup-Hinweis:
+- Nutze die `.env`-Datei für Zugangsdaten
+- Startbefehl ist automatisiert über `start.sh`
