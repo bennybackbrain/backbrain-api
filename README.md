@@ -1,14 +1,16 @@
-# BackBrain API
+# BackBrain API (AutoStart)
 
-Diese API verbindet deine Custom GPT mit deiner Nextcloud via WebDAV. Sie erlaubt:
-- Auflisten von `.txt` und `.md` Dateien
-- Durchsuchen dieser Dateien nach Stichwörtern
-- Rückgabe der Treffer als Kontext für GPT-Antworten
+Fertig eingerichtete API für Render.com – sofort lauffähig.
 
-## Endpunkt
+## Funktionen
+- Durchsucht alle `.txt` und `.md` Dateien in deinem Nextcloud-Ordner `benny_gpt`
+- Gibt Trefferstellen mit Kontext an GPT zurück
+
+## Startbefehl
+Wird automatisch über `start.sh` ausgeführt.
+
+## .env
+Leg dein Passwort hier rein (Beispiel enthalten)
+
+## URL
 GET /search-files?query=begriff
-
-## .env-Variablen
-- NEXTCLOUD_USERNAME
-- NEXTCLOUD_PASSWORD
-- WEBDAV_URL
