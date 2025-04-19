@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: backbrain-api
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "bash start.sh"
-    autoDeploy: true
