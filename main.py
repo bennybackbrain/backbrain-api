@@ -1,43 +1,110 @@
 from flask import Flask, request, jsonify
-from webdav_handler import upload_to_webdav, search_files_for_keyword
+import requests
+import os
+import xml.etree.ElementTree as ET
+from dotenv import load_dotenv
+
+# ENV-Variablen laden
+load_dotenv()
+WEBDAV_URL = os.getenv("WEBDAV_URL")
+WEBDAV_USER = os.getenv("WEBDAV_USER")
+WEBDAV_PASSWORD = os.getenv("WEBDAV_PASSWORD")
 
 app = Flask(__name__)
 
-@app.route('/')
-def index():
-    return "Backbrain API is running."
-
-@app.route('/ping', methods=['GET'])
-def ping():
-    return jsonify({"status": "ok", "message": "pong"})
-
-@app.route('/upload', methods=['POST'])
+# Datei-Upload (inkl. Ordner-Erstellung)
+@app.route("/upload", methods=["POST"])
 def upload():
-    data = request.json
-    filename = data.get('filename')
-    content = data.get('content')
-    path = data.get('path', '/')
+    data = request.get_json()
+    filename = data.get("filename")
+    content = data.get("content")
+    path = data.get("path", "/")
 
-    if not filename or not content:
-        return jsonify({"error": "filename and content are required"}), 400
+    ensure_folder_exists(path)
+    upload_url = f"{WEBDAV_URL.rstrip('/')}/{path.strip('/')}/{filename}"
 
-    success = upload_to_webdav(filename, content, path)
+    response = requests.put(
+        upload_url,
+        data=content.encode("utf-8"),
+        auth=(WEBDAV_USER, WEBDAV_PASSWORD)
+    )
 
-    if success:
-        return jsonify({"status": "success", "filename": filename})
-    else:
-        return jsonify({"status": "failed"}), 500
+    return jsonify({
+        "status": "success" if response.status_code in [200, 201, 204] else "error",
+        "code": response.status_code,
+        "filename": filename,
+        "url": upload_url
+    })
 
-@app.route('/search', methods=['GET'])
-def search():
-    keyword = request.args.get('keyword')
-    path = request.args.get('path', '/benny_gpt/')
+# Ordner-Inhalt auflisten
+@app.route("/list", methods=["GET"])
+def list_files():
+    path = request.args.get("path", "/")
+    list_url = f"{WEBDAV_URL.rstrip('/')}/{path.strip('/')}"
 
-    if not keyword:
-        return jsonify({"error": "keyword is required"}), 400
+    headers = {
+        "Depth": "1",
+        "Content-Type": "application/xml"
+    }
 
-    results = search_files_for_keyword(path, keyword)
-    return jsonify({"results": results})
+    response = requests.request(
+        "PROPFIND",
+        list_url,
+        headers=headers,
+        auth=(WEBDAV_USER, WEBDAV_PASSWORD)
+    )
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    if not response.ok:
+        return jsonify({"status": "error", "message": response.text}), response.status_code
+
+    tree = ET.fromstring(response.text)
+    items = []
+
+    for resp in tree.findall("{DAV:}response"):
+        href = resp.find("{DAV:}href").text
+        name = href.strip("/").split("/")[-1]
+        if name and name != path.strip("/"):
+            items.append(name)
+
+    return jsonify({"status": "success", "items": items})
+
+# Datei-Inhalt lesen
+@app.route("/read", methods=["GET"])
+def read_file():
+    path = request.args.get("path")
+    if not path:
+        return jsonify({"status": "error", "message": "Pfad fehlt"}), 400
+
+    file_url = f"{WEBDAV_URL.rstrip('/')}/{path.strip('/')}"
+    response = requests.get(file_url, auth=(WEBDAV_USER, WEBDAV_PASSWORD))
+
+    if not response.ok:
+        return jsonify({"status": "error", "message": response.text}), response.status_code
+
+    return jsonify({
+        "status": "success",
+        "content": response.text
+    })
+
+# Ordner automatisch erstellen
+def ensure_folder_exists(path):
+    parts = path.strip("/").split("/")
+    current_path = ""
+    for part in parts:
+        current_path += f"/{part}"
+        folder_url = f"{WEBDAV_URL.rstrip('/')}/{current_path.strip('/')}/"
+        response = requests.request(
+            "MKCOL",
+            folder_url,
+            auth=(WEBDAV_USER, WEBDAV_PASSWORD)
+        )
+        # Fehler bei existierenden Ordnern (405) ignorieren
+
+# Ping-Check
+@app.route("/ping")
+def ping():
+    return "pong"
+
+# Startpunkt
+if __name__ == "__main__":
+    app.run(debug=True)
