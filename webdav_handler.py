@@ -1,70 +1,29 @@
 import requests
 from requests.auth import HTTPBasicAuth
+from xml.etree import ElementTree
 import os
-from dotenv import load_dotenv
 
-# Lädt .env-Datei automatisch
-load_dotenv()
+WEBDAV_URL = os.getenv("WEBDAV_URL", "https://nx69869.your-storageshare.de/remote.php/dav/files/chatgpt_sync/benny_gpt/")
+USERNAME = os.getenv("NEXTCLOUD_USERNAME")
+PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
 
-WEBDAV_URL = os.getenv("WEBDAV_URL")
-WEBDAV_USER = os.getenv("WEBDAV_USER")
-WEBDAV_PASS = os.getenv("WEBDAV_PASS")
+def list_files():
+    headers = {"Depth": "1"}
+    response = requests.request("PROPFIND", WEBDAV_URL, headers=headers, auth=HTTPBasicAuth(USERNAME, PASSWORD))
+    tree = ElementTree.fromstring(response.content)
 
-def upload_to_webdav(filename, content, path='/'):
-    try:
-        full_url = f"{WEBDAV_URL}{path}{filename}"
-        response = requests.put(
-            full_url,
-            data=content.encode('utf-8'),
-            auth=HTTPBasicAuth(WEBDAV_USER, WEBDAV_PASS)
-        )
-        return response.status_code in [200, 201, 204]
-    except Exception as e:
-        print(f"Upload failed: {e}")
-        return False
+    files = []
+    for resp in tree.findall("{DAV:}response"):
+        href = resp.find("{DAV:}href").text
+        if href.endswith(".md") or href.endswith(".txt"):
+            filename = href.split("/")[-1]
+            if filename:
+                files.append(filename)
+    return files
 
-def list_files(path='/'):
-    try:
-        response = requests.request(
-            method='PROPFIND',
-            url=f"{WEBDAV_URL}{path}",
-            auth=HTTPBasicAuth(WEBDAV_USER, WEBDAV_PASS),
-            headers={"Depth": "1"},
-        )
-        if response.status_code == 207:
-            return [
-                line.split('<D:href>')[1].split('</D:href>')[0]
-                for line in response.text.splitlines()
-                if '<D:href>' in line and not line.endswith('/')
-            ]
-        else:
-            return []
-    except Exception as e:
-        print(f"Fehler beim Listen: {e}")
-        return []
-
-def read_file(file_url):
-    try:
-        response = requests.get(file_url, auth=HTTPBasicAuth(WEBDAV_USER, WEBDAV_PASS))
-        if response.status_code == 200:
-            return response.text
-        else:
-            return ""
-    except Exception as e:
-        print(f"Fehler beim Lesen: {e}")
-        return ""
-
-def search_files_for_keyword(path, keyword):
-    files = list_files(path)
-    matched = []
-    for file_url in files:
-        if file_url.endswith(".txt") or file_url.endswith(".md"):
-            content = read_file(file_url)
-            if keyword.lower() in content.lower():
-                snippet_start = content.lower().find(keyword.lower())
-                snippet = content[snippet_start:snippet_start+300]
-                matched.append({
-                    "file": file_url,
-                    "match": snippet.strip()
-                })
-    return matched
+def read_file(filename):
+    url = WEBDAV_URL + filename
+    response = requests.get(url, auth=HTTPBasicAuth(USERNAME, PASSWORD))
+    if response.status_code == 200:
+        return response.text
+    return None
