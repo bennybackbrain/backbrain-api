@@ -98,13 +98,13 @@ def ensure_folder_exists(path):
             folder_url,
             auth=(WEBDAV_USER, WEBDAV_PASSWORD)
         )
-        # Fehler bei existierenden Ordnern (405) ignorieren
 
 # Ping-Check
 @app.route("/ping")
 def ping():
     return "pong"
 
-# Startpunkt
+# Startpunkt für Render (mit PORT von Umgebungsvariable)
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
